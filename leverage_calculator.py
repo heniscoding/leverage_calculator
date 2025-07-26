@@ -102,7 +102,7 @@ def remove_position(idx):
 # -----------------------
 # Layout
 # -----------------------
-st.title("Crypto Leverage Trade Calculator")
+st.title("Crypto Plays Leverage Trade Calculator")
 # Custom CSS for max width
 st.markdown(
     """
