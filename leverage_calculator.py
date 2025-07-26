@@ -76,7 +76,7 @@ def get_history(coin_id, days=7):
         return df.sort_values("time"), False
 
 # -----------------------
-# Risk Scoring
+# Risk Scoring & Fees
 # -----------------------
 def risk_score(total_exposure, total_margin, stop_losses):
     lr = total_exposure / total_margin if total_margin else float("inf")
@@ -100,47 +100,80 @@ def remove_position(idx):
         st.session_state.positions.pop(idx)
 
 # -----------------------
-# Layout
+# Layout & CSS
 # -----------------------
 st.title("Crypto Plays Leverage Trade Calculator")
-# Custom CSS for max width
-st.markdown(
-    """
-    <style>
-    .block-container {
-        max-width: 980px;
-        padding-left: 2rem;
-        padding-right: 2rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
+
+st.markdown("""
+<style>
+.instructions-box {
+    padding: 10px 15px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    margin-bottom: 20px;
+    background-color: #1e1e1e;
+    color: #ffffff;
+}
+.instructions-box strong { color: #4CAF50; }
+
+/* Make all buttons wide and no-wrap */
+div.stButton > button {
+    white-space: nowrap !important;
+    min-width: 140px   !important;
+}
+</style>
+<div class="instructions-box">
+<strong>Quick Start:</strong><br>
+• Add positions with your <em>Margin</em> &amp; <em>Leverage</em>.<br>
+• (Optional) Add Stop Loss &amp; Take Profit.<br>
+• Click <strong>Update Positions</strong> to calculate.<br>
+• Review <strong>Risk Score</strong>, <strong>Exposure</strong>, and run <strong>Scenario Simulations</strong>.
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+.block-container {
+    max-width: 980px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+use_live = st.checkbox(
+    "Use live prices",
+    value=True,
+    help="Fetch live prices from CoinGecko or use fallback static prices"
 )
-st.markdown("Build and analyze dynamic leveraged crypto positions.")
+maintenance_margin = st.slider(
+    "Maintenance Margin (%)",
+    0.1, 5.0, 0.5, step=0.1,
+    help="Minimum equity required to maintain your leveraged position. Default is 0.5%."
+)
 
-use_live = st.checkbox("Use live prices", value=True,
-                       help="Fetch live prices from CoinGecko or use fallback static prices")
-
-maintenance_margin = st.slider("Maintenance Margin (%)", 0.1, 5.0, 0.5, step=0.1,
-                               help="Minimum equity required to maintain your leveraged position. Default is 0.5%.")
-
-col_add, col_clear = st.columns(2)
+# -----------------------
+# Add‑Position Button Only
+# -----------------------
+col_add, _ = st.columns([1, 4])
 with col_add:
-    if st.button("Add Position", help="Add a new position with blank fields"):
-        st.session_state.positions.append({
-            "coin": "BTC",
-            "margin": 0.0,
-            "leverage": 0.0,
-            "stop_loss_pct": 0,
-            "take_profit_pct": 0
-        })
-        st.session_state.last_added_coin = "BTC"
-with col_clear:
-    if st.button("Clear All Positions", help="Remove all positions from the table"):
-        st.session_state.positions.clear()
-        st.session_state.last_added_coin = None
-        st.session_state.scenario_moves.clear()
+    add = st.button("Add Position", help="Add a new position with blank fields")
 
+if add:
+    st.session_state.positions.append({
+        "coin": "BTC",
+        "margin": 0.0,
+        "leverage": 0.0,
+        "stop_loss_pct": 0,
+        "take_profit_pct": 0
+    })
+    st.session_state.last_added_coin = "BTC"
+
+# -----------------------
+# Prices & Coin Map
+# -----------------------
 prices = get_prices(use_live)
 coin_map = {
     sym: (cid, prices.get(cid, {}).get("usd", 1.0))
@@ -153,40 +186,64 @@ coin_map = {
 }
 
 # -----------------------
-# Form for positions
+# Positions Form
 # -----------------------
 with st.form("positions_form"):
     remove_index = None
     for i, pos in enumerate(st.session_state.positions):
         st.markdown(f"#### Position {i+1}")
-        c1, c2, c3, c4, c5, c6 = st.columns([1, 1, 1, 1, 1, 0.4])
+        c1, c2, c3, c4, c5, c6 = st.columns([1,1,1,1,1,0.4])
 
         with c1:
-            pos["coin"] = st.selectbox("Coin", list(coin_map.keys()),
-                                       index=list(coin_map.keys()).index(pos["coin"]),
-                                       key=f"coin_{i}", help="Select the cryptocurrency")
+            pos["coin"] = st.selectbox(
+                "Coin",
+                list(coin_map.keys()),
+                index=list(coin_map.keys()).index(pos["coin"]),
+                key=f"coin_{i}",
+                help="Select the cryptocurrency"
+            )
         with c2:
-            pos["margin"] = st.number_input("Margin ($)", min_value=0.0,
-                                            value=float(pos["margin"]), step=1.0,
-                                            format="%.2f", key=f"m_{i}",
-                                            help="Amount of your own funds allocated")
+            pos["margin"] = st.number_input(
+                "Margin ($)",
+                min_value=0.0,
+                value=float(pos["margin"]),
+                step=1.0,
+                format="%.2f",
+                key=f"m_{i}",
+                help="Amount of your own funds allocated"
+            )
             if pos["margin"] == 0:
                 st.markdown("<span style='color:red'>⚠ Fill Margin</span>", unsafe_allow_html=True)
         with c3:
-            pos["leverage"] = st.number_input("Leverage (x)", min_value=0.0,
-                                              value=float(pos["leverage"]), step=0.1,
-                                              format="%.2f", key=f"l_{i}",
-                                              help="How many times your margin is multiplied")
+            pos["leverage"] = st.number_input(
+                "Leverage (x)",
+                min_value=0.0,
+                value=float(pos["leverage"]),
+                step=0.1,
+                format="%.2f",
+                key=f"l_{i}",
+                help="How many times your margin is multiplied"
+            )
             if pos["leverage"] == 0:
                 st.markdown("<span style='color:red'>⚠ Fill Leverage</span>", unsafe_allow_html=True)
         with c4:
-            pos["stop_loss_pct"] = st.number_input("Stop-Loss %", min_value=0, max_value=100,
-                                                   value=int(pos["stop_loss_pct"]), step=1, key=f"sl_{i}",
-                                                   help="Percentage drop from entry price where you exit")
+            pos["stop_loss_pct"] = st.number_input(
+                "Stop-Loss %",
+                min_value=0, max_value=100,
+                value=int(pos["stop_loss_pct"]),
+                step=1,
+                key=f"sl_{i}",
+                help="Percentage drop from entry price where you exit"
+            )
         with c5:
-            pos["take_profit_pct"] = st.number_input("Take-Profit %", min_value=0, max_value=100,
-                                                     value=int(pos["take_profit_pct"]), step=1, key=f"tp_{i}",
-                                                     help="Percentage gain from entry price where you exit")
+            pos["take_profit_pct"] = st.number_input(
+                "Take-Profit %",
+                min_value=0, max_value=100,
+                value=int(pos["take_profit_pct"]),
+                step=1,
+                key=f"tp_{i}",
+                help="Percentage gain from entry price where you exit"
+            )
         with c6:
             if st.form_submit_button(f"✖ {i+1}", help="Remove this position"):
                 remove_index = i
@@ -196,6 +253,12 @@ with st.form("positions_form"):
 if remove_index is not None:
     remove_position(remove_index)
     st.rerun()
+
+# -----------------------
+# Calculations
+# -----------------------
+# (rest of your code unchanged)
+
 
 # -----------------------
 # Calculations
