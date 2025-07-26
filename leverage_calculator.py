@@ -240,12 +240,6 @@ if skipped_positions:
 # -----------------------
 if data:
     df = pd.DataFrame(data)
-    # Add warning icon for risky positions
-    df["⚠"] = df.apply(
-        lambda r: "⚠" if pd.notna(r["Liquidation Price (USD)"]) 
-        and r["Liquidation Price (USD)"] >= r["Price (USD)"]*0.95 else "",
-        axis=1
-    )
 
     risk, advice = risk_score(total_exposure, total_margin, stop_losses)
     st.markdown(f"**Risk Score:** {risk}")
@@ -258,14 +252,21 @@ if data:
         if df[col].isna().all():
             df.drop(columns=[col], inplace=True)
 
-    def hl_pl(v): 
-        return f"color: {'green' if v>0 else 'red' if v<0 else 'black'}"
+    def hl_pl(v):
+        if isinstance(v, (int, float)):
+            if v > 0:
+                return "color:#00f100"   # Bright green
+            elif v < 0:
+                return "color:#D50000"   # Bright red
+            else:
+                return "color:#000000"   # Black
+        return "color:#000000"
 
     def hl_liq(row):
         liq = row["Liquidation Price (USD)"]
         price = row["Price (USD)"]
         if pd.notna(liq) and liq >= price * 0.95:
-            return ["background-color:#ff8c00; color:black"] * len(row)
+            return ["background-color:#482727; color:white"] * len(row)
         else:
             return [""] * len(row)
 
@@ -287,7 +288,7 @@ if data:
     st.subheader(
         "Positions",
         help="This section lists all your positions, calculated exposure, and risk metrics. "
-            "Rows highlighted in orange indicate positions with liquidation prices close to the current market price. "
+            "Rows highlighted in dark red indicate positions with liquidation prices close to the current market price. "
             "Consider reducing leverage, adding margin, or using a stop-loss to lower risk."
     )
     st.dataframe(styled, use_container_width=True)
