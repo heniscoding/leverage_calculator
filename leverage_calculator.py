@@ -214,8 +214,8 @@ for pos in st.session_state.positions:
     ps = pos["margin"] * pos["leverage"]
     tok = ps / price if price else 0.0
     liq_price = price * (1 - (1 / pos["leverage"]) + (maintenance_margin / 100))
-    slp = (price*(1-pos["stop_loss_pct"]/100) - price)*tok if pos["stop_loss_pct"] > 0 else None
-    tpp = (price*(1+pos["take_profit_pct"]/100) - price)*tok if pos["take_profit_pct"] > 0 else None
+    slp = round((price * (1 - pos["stop_loss_pct"]/100) - price) * tok, 2) if pos["stop_loss_pct"] > 0 else None
+    tpp = round((price * (1 + pos["take_profit_pct"]/100) - price) * tok, 2) if pos["take_profit_pct"] > 0 else None
 
     data.append({
         "Coin": pos["coin"],
@@ -270,16 +270,21 @@ if data:
         else:
             return [""] * len(row)
 
-    styled = (df.drop(columns="Coin ID")
-               .style
-               .format({
-                   "Price (USD)": "{:,.4f}",
-                   "Tokens": "{:,.2f}",
-                   "Position Size (USD)": "${:,.2f}",
-                   "Margin (USD)": "${:,.2f}",
-                   "Liquidation Price (USD)": "{:,.4f}"
-               })
-               .apply(hl_liq, axis=1))
+    styled = (
+        df.drop(columns="Coin ID")
+        .style
+        .hide(axis="index")  # <--- this hides the index
+        .format({
+            "Price (USD)": "{:,.4f}",
+            "Tokens": "{:,.2f}",
+            "Position Size (USD)": "${:,.2f}",
+            "Margin (USD)": "${:,.2f}",
+            "Liquidation Price (USD)": "{:,.4f}",
+            "Stop Loss P/L (USD)": "${:,.2f}",
+            "Take Profit P/L (USD)": "${:,.2f}"
+        })
+        .apply(hl_liq, axis=1)
+    )
 
     pl_cols = [c for c in df.columns if "P/L" in c]
     if pl_cols:
@@ -354,7 +359,7 @@ if data:
         })
 
     scenario_df = pd.DataFrame(scenario_results)
-    scenario_styled = scenario_df.style.applymap(
+    scenario_styled = scenario_df.style.map(
         lambda v: "color:green" if isinstance(v, (int, float)) and v > 0 else
                 "color:red" if isinstance(v, (int, float)) and v < 0 else "",
         subset=["P/L (USD)"]
