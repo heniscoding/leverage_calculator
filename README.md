@@ -2,26 +2,24 @@
 
 &#x20;
 
-A **Streamlit-based web application** for calculating leveraged crypto positions across multiple coins, complete with risk scoring, scenario simulation, historical price charts, and CSV export functionality.
+A **Streamlit-based web app** to build and analyze leveraged crypto positions dynamically, with per-position stop-loss and take-profit settings, risk scoring, and visual analytics.
 
 ---
 
 ## Features
 
-- Multi-coin leverage & margin calculator
-- Risk scoring (Low / Medium / High) with actionable advice
-- Stop-loss & take-profit scenario P/L analysis
-- Market move simulation (percentage-based)
-- Historical 7-day price charts using Coingecko API
-- Downloadable CSV export of position summary
+- **Dynamic position builder** – add/remove positions interactively
+- **Per-position stop-loss & take-profit** – each position can have unique strategy parameters
+- **Risk scoring** – based on leverage and stop-loss usage
+- **Scenario simulation** – model price changes and see P/L impacts
+- **Historical price charts** – powered by Coingecko API
+- **CSV export** – clean output with only relevant columns
 
 ---
 
 ## Screenshot
 
-
-
-*(Place your own screenshot at **``**)*
+&#x20;*(Add your screenshot under **`docs/screenshot.png`**)*
 
 ---
 
@@ -34,19 +32,13 @@ git clone https://github.com/<YOUR_USERNAME>/leverage_calculator.git
 cd leverage_calculator
 ```
 
-### 2. Create and Activate a Virtual Environment
-
-#### On Windows
-
-```powershell
-python -m venv .venv
-.venv\Scripts\activate
-```
-
-#### On macOS / Linux
+### 2. Create a Virtual Environment
 
 ```bash
-python3 -m venv .venv
+python -m venv .venv
+# On Windows
+env\.venv\Scripts\activate
+# On macOS/Linux
 source .venv/bin/activate
 ```
 
@@ -64,14 +56,18 @@ pip install -r requirements.txt
 streamlit run leverage_calculator.py
 ```
 
-Open your browser and navigate to [http://localhost:8501](http://localhost:8501).
+Open your browser and go to [http://localhost:8501](http://localhost:8501)
 
 ---
 
-## Exported Files
+## Usage
 
-- **CSV Export**: Download your position summary directly from the app.
-- **Requirements**: Minimal, portable dependencies listed in `requirements.txt`.
+1. Click **Add Position** to add your first trade
+2. Choose a coin, margin, leverage, stop-loss %, and take-profit %
+3. Add more positions as needed, or remove them individually
+4. Use **Clear All Positions** to reset the portfolio
+5. Review risk scoring, charts, and historical price data
+6. Download a clean CSV of your positions
 
 ---
 
@@ -83,18 +79,18 @@ leverage_calculator/
 ├─ requirements.txt         # Minimal dependencies
 ├─ README.md                # Project documentation (this file)
 └─ docs/
-   └─ screenshot.png        # App screenshot placeholder
+   └─ screenshot.png        # Optional app screenshot placeholder
 ```
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for more details.
+This project is licensed under the MIT License – see [LICENSE](LICENSE) for details.
 
 ---
 
 ## Contributing
 
-Pull requests are welcome! For significant changes, please open an issue first to discuss your ideas.
+Pull requests are welcome! For major changes, please open an issue first to discuss your ideas.
 
