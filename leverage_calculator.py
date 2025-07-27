@@ -166,6 +166,17 @@ div[data-testid="stButton"][id*="remove_"] button p {
 div[data-testid="stColumn"]:last-child > div[data-testid="stVerticalBlock"] {
     justify-content: center !important;
 }
+div[data-testid="stButton"] > button[kind="primary"] {
+    background-color: #00b106 !important;  /* your primary green */
+    color: white !important;
+    font-weight: 600 !important;
+    border-radius: 6px !important;
+    height: 40px !important;
+    font-size: 14px !important;
+}
+div[data-testid="stButton"] > button[kind="primary"]:hover {
+    background-color: #009505 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
