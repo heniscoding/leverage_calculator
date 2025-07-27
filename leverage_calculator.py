@@ -177,6 +177,12 @@ div[data-testid="stButton"] > button[kind="primary"] {
 div[data-testid="stButton"] > button[kind="primary"]:hover {
     background-color: #009505 !important;
 }
+/* Remove orange focus outline from all Streamlit buttons */
+div[data-testid="stButton"] > button:focus,
+div[data-testid="stDownloadButton"] > button:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
