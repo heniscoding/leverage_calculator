@@ -183,6 +183,13 @@ div[data-testid="stDownloadButton"] > button:focus {
     outline: none !important;
     box-shadow: none !important;
 }
+/* Remove border for primary and secondary buttons */
+div[data-testid="stButton"] > button[kind="primary"],
+div[data-testid="stButton"] > button[kind="secondary"],
+div[data-testid="stDownloadButton"] > button {
+    border: none !important;
+    box-shadow: none !important; /* also remove subtle outline */
+}
 </style>
 """, unsafe_allow_html=True)
 
