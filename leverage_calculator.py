@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 import datetime
 import numpy as np
+import uuid, json
 
 # -----------------------
 # Session State Init
@@ -115,24 +116,10 @@ div[data-testid="stButton"] button {
     padding-left: 2rem;
     padding-right: 2rem;
 }
-</style>
-<div class="instructions-box">
-<strong>Quick Start:</strong><br>
-• Add positions with your <em>Margin</em> &amp; <em>Leverage</em>.<br>
-• (Optional) Add Stop Loss &amp; Take Profit.<br>
-• All calculations update automatically when you change values.<br>
-• Review <strong>Exposure</strong> and run <strong>Scenario Simulations</strong>.
-</div>
-""", unsafe_allow_html=True)
 
-# -----------------------
-# Add Position Toolbar Styles
-# -----------------------
-st.markdown("""
-<style>
-/* Reduce spacing between columns */
-div[data-testid="stHorizontalBlock"] {
-    gap: 0.5rem !important;
+/* ONLY Add top/bottom margin to the row with the Add Position button */
+div[data-testid="stHorizontalBlock"]:has(.st-key-add_position_btn) {
+    margin-top: 15px !important;
 }
 
 /* Reduce vertical gap between stacked elements */
@@ -166,8 +153,10 @@ div[data-testid="stButton"][id*="remove_"] button p {
 div[data-testid="stColumn"]:last-child > div[data-testid="stVerticalBlock"] {
     justify-content: center !important;
 }
+
+/* Primary button style */
 div[data-testid="stButton"] > button[kind="primary"] {
-    background-color: #00b106 !important;  /* your primary green */
+    background-color: #00b106 !important;
     color: white !important;
     font-weight: 600 !important;
     border-radius: 6px !important;
@@ -177,32 +166,86 @@ div[data-testid="stButton"] > button[kind="primary"] {
 div[data-testid="stButton"] > button[kind="primary"]:hover {
     background-color: #009505 !important;
 }
+
 /* Remove orange focus outline from all Streamlit buttons */
 div[data-testid="stButton"] > button:focus,
 div[data-testid="stDownloadButton"] > button:focus {
     outline: none !important;
     box-shadow: none !important;
 }
+
 /* Remove border for primary and secondary buttons */
 div[data-testid="stButton"] > button[kind="primary"],
 div[data-testid="stButton"] > button[kind="secondary"],
 div[data-testid="stDownloadButton"] > button {
     border: none !important;
-    box-shadow: none !important; /* also remove subtle outline */
+    box-shadow: none !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(.position-block) {
+    gap: 0 !important; /* adjust as needed */
 }
 </style>
+
+<div class="instructions-box">
+<strong>Quick Start:</strong><br>
+• Add positions with your <em>Margin</em> &amp; <em>Leverage</em>.<br>
+• (Optional) Add Stop Loss &amp; Take Profit.<br>
+• All calculations update automatically when you change values.<br>
+• Review <strong>Exposure</strong> and run <strong>Scenario Simulations</strong>.
+</div>
 """, unsafe_allow_html=True)
+
+# --- One-time upload flag ---
+if "positions_uploaded" not in st.session_state:
+    st.session_state.positions_uploaded = False
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+
+with st.expander("📂 Manage Positions (Save & Load)", expanded=False):
+    if st.session_state.positions:
+        positions_json = json.dumps(st.session_state.positions, indent=2)
+        st.download_button(
+            "💾 Download Positions",
+            positions_json,
+            file_name="positions.json",
+            mime="application/json",
+            key="download_positions"
+        )
+
+    uploaded_file = st.file_uploader(
+        "Upload Positions (JSON)",
+        type="json",
+        key=f"positions_upload_{st.session_state.uploader_key}"
+    )
+
+    if uploaded_file is not None and not st.session_state.positions_uploaded:
+        try:
+            uploaded_positions = json.load(uploaded_file)
+            for pos in uploaded_positions:
+                if "id" not in pos:
+                    pos["id"] = str(uuid.uuid4())
+            st.session_state.positions = uploaded_positions
+            st.session_state.last_added_coin = (
+                uploaded_positions[0]["coin"] if uploaded_positions else None
+            )
+            st.session_state.positions_uploaded = True
+            st.success("Positions loaded successfully! Refreshing...")
+            st.session_state.uploader_key += 1
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error loading positions: {e}")
+
+if st.session_state.positions_uploaded:
+    st.session_state.positions_uploaded = False
 
 # --- Toolbar row ---
 col1, col2, col3 = st.columns([1, 1, 1])
-
 with col1:
     add = st.button("✛ Add Position", type="primary", key="add_position_btn")
-
 with col2:
     use_live = st.checkbox("Use live prices", value=True,
                            help="Fetch live prices from CoinGecko or use fallback static prices")
-
 with col3:
     maintenance_margin = st.number_input(
         "Maintenance Margin (%)",
@@ -210,13 +253,12 @@ with col3:
         max_value=5.0,
         value=0.5,
         step=0.1,
-        label_visibility="collapsed"  # hides label above input
+        label_visibility="collapsed"
     )
-    st.caption("Maintenance Margin (%)")  # caption under input for clarity
+    st.caption("Maintenance Margin (%)")
 
-# --- Handle button click ---
 if add:
-    st.session_state.positions.append({
+    st.session_state.positions.insert(0, {
         "coin": "BTC",
         "margin": 0.0,
         "leverage": 0.0,
@@ -232,9 +274,9 @@ if st.session_state.positions:
     total_margin = sum(pos["margin"] for pos in st.session_state.positions)
     total_exposure = sum(pos["margin"] * pos["leverage"] for pos in st.session_state.positions)
     funding = funding_fee(total_exposure)
-    
+
     st.markdown(f"""
-        <div style="background-color:#2a2a2a; border:1px solid #444; border-radius:6px; 
+        <div style="background-color:#2a2a2a; border:1px solid #444; border-radius:6px;
                     padding:15px; margin:15px 0; color:white;">
             <strong>Total Margin:</strong> ${total_margin:,.2f} &nbsp; | &nbsp;
             <strong>Total Exposure:</strong> ${total_exposure:,.2f}<br>
@@ -244,85 +286,96 @@ if st.session_state.positions:
             </div>
         </div>
     """, unsafe_allow_html=True)
-    
     st.divider()
 
-# -----------------------
-# Prices & Coin Map
-# -----------------------
-coin_map = {
-    sym: (cid, prices.get(cid, {}).get("usd", 1.0))
-    for sym, cid in [
-        ("BTC","bitcoin"),("ETH","ethereum"),("SOL","solana"),
-        ("ADA","cardano"),("SUI","sui"),("LINK","chainlink"),
-        ("PEPE","pepe"),("AAVE","aave"),("ONDO","ondo-finance"),
-        ("PAAL","paal-ai")
-    ]
-}
+@st.cache_data(ttl=300)
+def get_top_coins(limit=50):
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+    params = {"vs_currency": "usd", "order": "market_cap_desc", "per_page": limit, "page": 1, "sparkline": "false"}
+    try:
+        response = requests.get(url, params=params, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        return {item["symbol"].upper(): (item["id"], item["current_price"]) for item in data}
+    except Exception as e:
+        st.warning(f"Failed to fetch top coins: {e}. Falling back to static list.")
+        return {
+            "BTC": ("bitcoin", prices.get("bitcoin", {}).get("usd", 1.0)),
+            "ETH": ("ethereum", prices.get("ethereum", {}).get("usd", 1.0)),
+            "SOL": ("solana", prices.get("solana", {}).get("usd", 1.0)),
+            "ADA": ("cardano", prices.get("cardano", {}).get("usd", 1.0)),
+            "SUI": ("sui", prices.get("sui", {}).get("usd", 1.0)),
+            "LINK": ("chainlink", prices.get("chainlink", {}).get("usd", 1.0)),
+            "PEPE": ("pepe", prices.get("pepe", {}).get("usd", 1.0)),
+            "AAVE": ("aave", prices.get("aave", {}).get("usd", 1.0)),
+            "ONDO": ("ondo-finance", prices.get("ondo-finance", {}).get("usd", 1.0)),
+            "PAAL": ("paal-ai", prices.get("paal-ai", {}).get("usd", 1.0)),
+        }
 
-# -----------------------
-# Positions (auto-update)
-# -----------------------
+coin_map = get_top_coins(50)
+
+for pos in st.session_state.positions:
+    if "id" not in pos:
+        pos["id"] = str(uuid.uuid4())
+
+# --- Positions rendering ---
 remove_index = None
-for i, pos in enumerate(st.session_state.positions):
-    coin_value = st.session_state.get(f"coin_{i}", pos["coin"])
-    margin_value = st.session_state.get(f"m_{i}", pos["margin"])
-    leverage_value = st.session_state.get(f"l_{i}", pos["leverage"])
-    margin_fmt = f"${margin_value:,.0f}" if margin_value.is_integer() else f"${margin_value:,.2f}"
-    leverage_fmt = f"{leverage_value:.0f}x" if leverage_value.is_integer() else f"{leverage_value:.2f}x"
+for idx, pos in enumerate(st.session_state.positions):
+    pos_id = pos["id"]
+    st.markdown(f"""<div class="position-block position-{idx}">""", unsafe_allow_html=True)
+    margin_fmt = f"${pos['margin']:,.0f}" if pos['margin'].is_integer() else f"${pos['margin']:,.2f}"
+    leverage_fmt = f"{pos['leverage']:.0f}x" if pos['leverage'].is_integer() else f"{pos['leverage']:.2f}x"
     st.markdown(
-        f"<p style='font-size:18px; font-weight:700;'>"
-        f"Position {i+1} "
-        f"<span style='font-size:16px; font-weight:400;'>({coin_value} – {margin_fmt} Margin × {leverage_fmt})</span>"
-        f"</p>",
+        f"""
+        <div style='background: rgba(0, 177, 6, 0.28);
+                    padding: 8px 12px; border-radius: 6px; margin-bottom: 20px;'>
+            <p style='font-size:18px; font-weight:600; color:#3dfe00; margin:0;'>
+                Position {idx+1}
+                <span style='font-weight:400; color:#ffffff;'>&nbsp;({pos['coin']} – {margin_fmt} Margin × {leverage_fmt})</span>
+            </p>
+        </div>
+        """,
         unsafe_allow_html=True
     )
-
     c1, c2, c3, c4, c5, c6 = st.columns([1, 1, 1, 1, 1, 0.4])
     with c1:
         pos["coin"] = st.selectbox("Coin", list(coin_map.keys()),
                                    index=list(coin_map.keys()).index(pos["coin"]),
-                                   key=f"coin_{i}", help="Select the cryptocurrency")
+                                   key=f"coin_{pos_id}", help="Select the cryptocurrency")
     with c2:
         pos["margin"] = st.number_input("Margin ($)", min_value=0.0,
                                         value=float(pos["margin"]), step=1.0,
-                                        format="%.2f", key=f"m_{i}",
+                                        format="%.2f", key=f"m_{pos_id}",
                                         help="Amount of your own funds allocated")
         if pos["margin"] == 0:
             st.markdown("<span style='color:red'>⚠ Fill Margin</span>", unsafe_allow_html=True)
     with c3:
         pos["leverage"] = st.number_input("Leverage (x)", min_value=0.0,
                                           value=float(pos["leverage"]), step=0.1,
-                                          format="%.2f", key=f"l_{i}",
+                                          format="%.2f", key=f"l_{pos_id}",
                                           help="How many times your margin is multiplied")
         if pos["leverage"] == 0:
             st.markdown("<span style='color:red'>⚠ Fill Leverage</span>", unsafe_allow_html=True)
     with c4:
         pos["stop_loss_pct"] = st.number_input("Stop-Loss %", min_value=0, max_value=100,
-                                               value=int(pos["stop_loss_pct"]), step=1, key=f"sl_{i}",
-                                               help="Percentage drop from entry price where you exit")
+                                               value=int(pos["stop_loss_pct"]), step=1, key=f"sl_{pos_id}")
     with c5:
         pos["take_profit_pct"] = st.number_input("Take-Profit %", min_value=0, max_value=100,
-                                                 value=int(pos["take_profit_pct"]), step=1, key=f"tp_{i}",
-                                                 help="Percentage gain from entry price where you exit")
+                                                 value=int(pos["take_profit_pct"]), step=1, key=f"tp_{pos_id}")
     with c6:
-        if st.button("🗑️", key=f"remove_{i}", help="Remove this position"):
-            remove_index = i
-
+        if st.button("🗑️", key=f"remove_{pos_id}", help="Remove this position"):
+            remove_index = idx
+    st.markdown("</div>", unsafe_allow_html=True)
     st.divider()
 
 if remove_index is not None:
     remove_position(remove_index)
     st.rerun()
 
-# -----------------------
-# Calculations
-# -----------------------
+# --- Calculations ---
 data = []
 total_margin = total_exposure = 0.0
-stop_losses = []
 skipped_positions = 0
-
 for pos in st.session_state.positions:
     if pos["margin"] == 0 or pos["leverage"] == 0:
         skipped_positions += 1
@@ -342,17 +395,12 @@ for pos in st.session_state.positions:
     })
     total_margin += pos["margin"]
     total_exposure += ps
-    stop_losses.append(pos["stop_loss_pct"])
 
 if skipped_positions:
     st.warning(f"{skipped_positions} position(s) skipped because Margin or Leverage = 0")
 
-# -----------------------
-# Summary & Charts
-# -----------------------
 if data:
     df = pd.DataFrame(data)
-
     for col in ["Stop Loss P/L (USD)", "Take Profit P/L (USD)"]:
         if df[col].isna().all():
             df.drop(columns=[col], inplace=True)
@@ -368,18 +416,15 @@ if data:
         return ["background-color:#482727; color:white"] * len(row) \
             if pd.notna(liq) and liq >= price * 0.95 else [""] * len(row)
 
-    styled = (
-        df.drop(columns="Coin ID")
-        .style
-        .hide(axis="index")
-        .format({
-            "Price (USD)": "{:,.4f}", "Tokens": "{:,.2f}",
-            "Position Size (USD)": "${:,.2f}", "Margin (USD)": "${:,.2f}",
-            "Liquidation Price (USD)": "{:,.4f}",
-            "Stop Loss P/L (USD)": "${:,.2f}", "Take Profit P/L (USD)": "${:,.2f}"
-        })
-        .apply(hl_liq, axis=1)
-    )
+    styled = (df.drop(columns="Coin ID")
+              .style.hide(axis="index")
+              .format({
+                  "Price (USD)": "{:,.4f}", "Tokens": "{:,.2f}",
+                  "Position Size (USD)": "${:,.2f}", "Margin (USD)": "${:,.2f}",
+                  "Liquidation Price (USD)": "{:,.4f}",
+                  "Stop Loss P/L (USD)": "${:,.2f}", "Take Profit P/L (USD)": "${:,.2f}"
+              })
+              .apply(hl_liq, axis=1))
     pl_cols = [c for c in df.columns if "P/L" in c]
     if pl_cols:
         styled = styled.map(hl_pl, subset=pl_cols)
@@ -388,8 +433,6 @@ if data:
     st.dataframe(styled, use_container_width=True)
 
     csv = df.drop(columns="Coin ID").to_csv(index=False).encode("utf-8")
-
-    # Custom style for download button
     st.markdown("""
     <style>
     div[data-testid="stDownloadButton"] > button {
@@ -406,38 +449,31 @@ if data:
     }
     </style>
     """, unsafe_allow_html=True)
-
     st.download_button("Download CSV", csv, "positions.csv", "text/csv")
+    st.divider()
 
-    # --- Exposure (collapsible)
     with st.expander("Exposure", expanded=False):
         st.bar_chart(df.set_index("Coin")[["Position Size (USD)"]])
-
-    # --- P/L Impact (collapsible)
     if pl_cols:
         with st.expander("P/L Impact", expanded=False):
             st.bar_chart(df.set_index("Coin")[pl_cols])
-
-    # --- Scenario Simulation (collapsible)
     with st.expander("Scenario Simulation", expanded=False):
         if st.button("Reset All to Zero"):
             st.session_state.scenario_moves = {coin: 0 for coin in df["Coin"].unique()}
-        scenario_results = []
-        total_portfolio_pnl = 0.0
+        scenario_results, total_portfolio_pnl = [], 0.0
         for coin in df["Coin"].unique():
-            current_move = st.session_state.scenario_moves.get(coin, 0)
-            move = st.slider(f"{coin} Move (%)", -50, 50, current_move, key=f"move_{coin}")
+            move = st.slider(f"{coin} Move (%)", -50, 50,
+                             st.session_state.scenario_moves.get(coin, 0),
+                             key=f"move_{coin}")
             st.session_state.scenario_moves[coin] = move
-            coin_positions = df[df["Coin"] == coin]
             combined_pnl = sum(
                 (row["Price (USD)"] * (1 + move / 100) - row["Price (USD)"]) * row["Tokens"]
-                for _, row in coin_positions.iterrows()
+                for _, row in df[df["Coin"] == coin].iterrows()
             )
             total_portfolio_pnl += combined_pnl
             scenario_results.append({"Coin": coin, "Move (%)": move, "P/L (USD)": round(combined_pnl, 2)})
-        scenario_df = pd.DataFrame(scenario_results)
         st.dataframe(
-            scenario_df.style.map(
+            pd.DataFrame(scenario_results).style.map(
                 lambda v: "color:green" if isinstance(v, (int, float)) and v > 0 else
                           "color:red" if isinstance(v, (int, float)) and v < 0 else "",
                 subset=["P/L (USD)"]
@@ -446,12 +482,11 @@ if data:
         )
         st.markdown(f"### **Net Portfolio P/L: ${total_portfolio_pnl:,.2f}**")
 
-    # --- Historical Price (collapsible)
     with st.expander("Historical Price (7d)", expanded=False):
         unique_positions = df[["Coin", "Coin ID"]].drop_duplicates().reset_index(drop=True)
         default_coin = st.session_state.last_added_coin or unique_positions.iloc[0]["Coin"]
-        default_index = 0 if default_coin not in unique_positions["Coin"].values else \
-                        int(unique_positions.index[unique_positions["Coin"] == default_coin][0])
+        default_index = int(unique_positions.index[unique_positions["Coin"] == default_coin][0]) \
+                        if default_coin in unique_positions["Coin"].values else 0
         sel = st.selectbox("Coin", unique_positions["Coin"].tolist(), index=default_index)
         cid = unique_positions.loc[unique_positions["Coin"] == sel, "Coin ID"].iloc[0]
         hist, real = get_history(cid)
